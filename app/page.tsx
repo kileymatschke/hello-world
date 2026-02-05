@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export default function Home() {
     const [pageCaption, setPageCaption] = useState<string | null>(null);
@@ -12,18 +12,18 @@ export default function Home() {
     const [selectedItem, setSelectedItem] = useState<typeof displayItems[0] | null>(null);
     const itemsPerPage = 100;
 
-    // Fetch the main page caption
-    useEffect(() => {
-        async function fetchPageCaption() {
-            const { data, error } = await supabase.from('captions').select('content').limit(1);
-            if (error) {
-                console.error('Error fetching page caption:', error);
-            } else if (data && data.length > 0) {
-                setPageCaption(data[0].content);
-            }
-        }
-        fetchPageCaption();
-    }, []);
+    // // Fetch the main page caption
+    // useEffect(() => {
+    //     async function fetchPageCaption() {
+    //         const { data, error } = await supabase.from('captions').select('content').limit(1);
+    //         if (error) {
+    //             console.error('Error fetching page caption:', error);
+    //         } else if (data && data.length > 0) {
+    //             setPageCaption(data[0].content);
+    //         }
+    //     }
+    //     fetchPageCaption();
+    // }, []);
 
     // Fetch images and their associated captions
     useEffect(() => {
@@ -165,14 +165,11 @@ export default function Home() {
     return (
         <main className="min-h-screen flex flex-col items-center justify-center text-center p-4">
             <h1 className="text-4xl font-bold mb-8">The Humor Project</h1>
+            {pageCaption && <h2 className="text-2xl font-semibold mb-6 text-gray-700">{pageCaption}</h2>}
 
             <section className="w-full max-w-4xl">
-                {/*<h2 className="text-3xl font-semibold mb-6">Our Images</h2>*/}
-                <p className="text-lg mb-8">Click on an image to expand it.</p>
-                {/*<p className="text-lg mb-4">Total items: {filteredItems.length}</p>*/}
                 {loading && <p>Loading images and captions...</p>}
                 {error && <p className="text-red-500">{error}</p>}
-                {/*{!loading && !error && filteredItems.length === 0 && <p>No images or captions found.</p>}*/}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     {currentItems.map((item) => (
