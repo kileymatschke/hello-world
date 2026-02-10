@@ -51,7 +51,7 @@ export default function GalleryClient() {
 
     const handleSignOut = async () => {
         await supabase.auth.signOut()
-        router.push('/login')
+        router.push('/')
     }
 
     // Fetch images and their associated captions (existing logic)
