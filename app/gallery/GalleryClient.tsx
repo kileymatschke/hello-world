@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client' // Use the client component version
 import { useRouter } from 'next/navigation'
 
@@ -12,6 +12,8 @@ export default function GalleryClient() {
     >([])
     const [authLoading, setAuthLoading] = useState(true)
     const [dataLoading, setDataLoading] = useState(false)
+
+    const hasFetchedRef = useRef(false);
 
     const [error, setError] = useState<string | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
@@ -60,6 +62,10 @@ export default function GalleryClient() {
             setDataLoading(false)
             return
         }
+
+        if (hasFetchedRef.current) return;
+        hasFetchedRef.current = true;
+
         const client = supabase;
 
 
