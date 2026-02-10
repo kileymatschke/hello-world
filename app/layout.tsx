@@ -23,17 +23,15 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({
-  children,
-}: Readonly<{
+                                     children,
+                                   }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${lexend.variable} antialiased`}
-      >
-        {children}
+      <html lang="en">
+      <body className={`${lexend.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}>
+      {children}
       </body>
-    </html>
+      </html>
   );
 }
