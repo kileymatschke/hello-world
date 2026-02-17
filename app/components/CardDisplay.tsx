@@ -93,6 +93,7 @@ export default function CardDisplay() {
                                 profile_id: profileId,
                                 vote_value,
                                 created_datetime_utc: new Date().toISOString(),
+                                modified_datetime_utc: new Date().toISOString()
                             });
 
 
