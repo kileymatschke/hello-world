@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import LoginPage from "./LoginPage";
-import GalleryClient from "./gallery/GalleryClient";
+import CardDisplay from "./components/CardDisplay";
 
 export default async function Home() {
     const supabase = await createClient();
@@ -15,18 +15,5 @@ export default async function Home() {
     }
 
     // Logged in → show gallery
-    return <GalleryClient />;
+    return <CardDisplay />;
 }
-
-
-
-// import { redirect } from "next/navigation";
-// import { createClient } from "@/lib/supabase/server";
-//
-// export default async function Home() {
-//     const supabase = await createClient();
-//     const { data: { user } } = await supabase.auth.getUser();
-//
-//     if (user) redirect("/gallery");
-//     redirect("/login");
-// }
