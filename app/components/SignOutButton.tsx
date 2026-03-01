@@ -15,7 +15,9 @@ export default function SignOutButton() {
     return (
         <button
             onClick={handleSignOut}
-            className="px-4 py-2 rounded bg-red-600 text-white font-semibold shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            className="px-4 py-2 rounded bg-(--foreground) text-(--background) text-sm font-semibold shadow-md hover:bg-[#fcdfb6] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            style={{ fontFamily: "var(--font-adelia)" }}
+
         >
             Sign Out
         </button>

@@ -20,9 +20,10 @@ export default function LoginPage() {
         <main className="min-h-screen grid place-items-center p-6">
             <button
                 onClick={signInWithGoogle}
-                className="px-4 py-2 rounded bg-black text-white"
+                className="px-4 py-2 rounded bg-[var(--foreground)] text-[var(--background)]"
+                style={{ fontFamily: "var(--font-adelia)" }}
             >
-                Continue with Google
+                Sign in with Google
             </button>
         </main>
     );

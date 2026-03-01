@@ -1,6 +1,18 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import { Geist, Geist_Mono, Lexend } from "next/font/google";
 import "./globals.css";
+
+
+const myFont = localFont({
+    src: "./fonts/kindergarten.ttf",
+    variable: "--font-custom",
+});
+
+const secondFont = localFont({
+    src: "./fonts/ADELIA.otf",
+    variable: "--font-adelia",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +41,9 @@ export default function RootLayout({
 }>) {
   return (
       <html lang="en">
-      <body className={`${lexend.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+          className={`${myFont.variable} ${secondFont.variable} ${lexend.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
       {children}
       </body>
       </html>
