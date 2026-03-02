@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import CardDisplay from "./components/CardDisplay";
 
 export default async function Home() {
     const supabase = await createClient();
@@ -8,5 +7,6 @@ export default async function Home() {
 
     if (!user) redirect("/login");
 
-    return <CardDisplay />;
+    // ✅ always send logged-in users to gallery
+    redirect("/gallery");
 }
