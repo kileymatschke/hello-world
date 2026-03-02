@@ -14,7 +14,6 @@ export default async function GeneratePage() {
     if (!user) redirect("/login");
 
     return (
-
         <div className="relative min-h-screen p-6 flex flex-col items-center">
             <div className="absolute top-8 right-6">
                 <SignOutButton />
@@ -23,7 +22,7 @@ export default async function GeneratePage() {
             <div className="w-full max-w-xl flex justify-between mb-6">
 
                 {/* Left side: title + gallery stacked */}
-                <div className="flex flex-col items-start">
+                <div className="absolute top-6 left-6 flex flex-col items-start">
                     <h1
                         className="text-5xl font-bold"
                         style={{ fontFamily: "var(--font-custom)" }}
@@ -41,7 +40,10 @@ export default async function GeneratePage() {
                 </div>
             </div>
 
-            <GenerateCaptions />
+            <div className="mt-32">
+                <GenerateCaptions />
+            </div>
+
         </div>
     );
 }

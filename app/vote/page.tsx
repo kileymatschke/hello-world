@@ -19,7 +19,7 @@ export default async function VotePage() {
             <div className="w-full max-w-xl flex justify-between mb-6">
 
                 {/* Left side: title + gallery stacked */}
-                <div className="flex flex-col items-start">
+                <div className="absolute top-6 left-6 flex flex-col items-start">
                     <h1
                         className="text-5xl font-bold"
                         style={{ fontFamily: "var(--font-custom)" }}
@@ -37,7 +37,8 @@ export default async function VotePage() {
                 </div>
             </div>
 
-            <CardDisplay />
+            <div><CardDisplay /></div>
+
         </div>
     );
 }

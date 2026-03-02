@@ -14,6 +14,16 @@ const secondFont = localFont({
     variable: "--font-adelia",
 });
 
+const thirdFont = localFont({
+    src: "./fonts/coolvetica.otf",
+    variable: "--font-coolvetica",
+});
+
+const fourthFont = localFont({
+    src: "./fonts/fors.ttf",
+    variable: "--font-fors",
+});
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -42,7 +52,7 @@ export default function RootLayout({
   return (
       <html lang="en">
       <body
-          className={`${myFont.variable} ${secondFont.variable} ${lexend.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={`${myFont.variable} ${secondFont.variable} ${thirdFont.variable} ${fourthFont.variable} ${lexend.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
       {children}
       </body>

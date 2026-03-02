@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,6 +20,30 @@ export default function CardDisplay() {
     const [error, setError] = useState<string | null>(null);
     const [profileId, setProfileId] = useState<string | null>(null);
 
+    // ✅ prevents double-fetch on initial render (dev Strict Mode)
+    const didInitialFetch = useRef(false);
+
+    const fetchCard = async () => {
+        setLoadingCard(true);
+        setError(null);
+        try {
+            const response = await fetch("/api/cards", { cache: "no-store" });
+            if (response.status === 401) {
+                router.push("/login");
+                return;
+            }
+            if (!response.ok) throw new Error("Failed to fetch card: " + response.statusText);
+
+            const data: Card = await response.json();
+            setCard(data);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "An unknown error occurred");
+        } finally {
+            setLoadingCard(false);
+        }
+    };
+
+    // 1) Get user + subscribe to auth changes
     useEffect(() => {
         const getProfile = async () => {
             const { data: { user } } = await supabase.auth.getUser();
@@ -39,29 +63,14 @@ export default function CardDisplay() {
         return () => authListener?.subscription?.unsubscribe();
     }, [supabase, router]);
 
-    const fetchCard = async () => {
-        setLoadingCard(true);
-        setError(null);
-        try {
-            const response = await fetch("/api/cards");
-            if (response.status === 401) {
-                router.push("/login");
-                return;
-            }
-            if (!response.ok) throw new Error("Failed to fetch card: " + response.statusText);
-
-            const data: Card = await response.json();
-            setCard(data);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "An unknown error occurred");
-        } finally {
-            setLoadingCard(false);
-        }
-    };
-
+    // 2) ✅ Fetch the first card only AFTER we have a profileId, and only once
     useEffect(() => {
+        if (!profileId) return;
+        if (didInitialFetch.current) return;
+
+        didInitialFetch.current = true;
         void fetchCard();
-    }, []);
+    }, [profileId]);
 
     const voteOnCaption = async (captionId: string, vote_value: 1 | -1) => {
         if (!profileId) {
@@ -111,20 +120,25 @@ export default function CardDisplay() {
                     alt={card.caption}
                     className="w-full h-auto object-cover rounded-md mb-4"
                 />
-                <p className="text-1xl text-center" style={{ fontFamily: "var(--font-adelia)", color:"var(--background)"}}>{card.caption}</p>
+                <p
+                    className="text-2xl text-center font-bold"
+                    style={{ fontFamily: "var(--font-fors)", color: "var(--background)" }}
+                >
+                    {card.caption}
+                </p>
 
                 <div className="mt-6 flex justify-center w-full">
                     <button
                         onClick={() => void voteOnCaption(card.caption_id, 1)}
                         disabled={voting}
-                        className="px-6 py-3 bg-[#7EB09B] text-white text-3xl font-bold rounded-lg shadow-md hover:bg-green-600 mr-8 disabled:opacity-50"
+                        className="px-6 py-3 bg-[#7EB09B] text-white text-3xl font-bold rounded-lg shadow-md hover:bg-[#a9cfbf] mr-8 disabled:opacity-50"
                     >
                         &uarr;
                     </button>
                     <button
                         onClick={() => void voteOnCaption(card.caption_id, -1)}
                         disabled={voting}
-                        className="px-6 py-3 bg-[#DE89BE] text-white text-3xl font-bold rounded-lg shadow-md hover:bg-red-600 ml-8 disabled:opacity-50"
+                        className="px-6 py-3 bg-[#DE89BE] text-white text-3xl font-bold rounded-lg shadow-md hover:bg-[#E3AACD] ml-8 disabled:opacity-50"
                     >
                         &darr;
                     </button>
