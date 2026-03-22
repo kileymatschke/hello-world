@@ -133,22 +133,39 @@ export default function CardDisplay() {
         setError(null);
 
         try {
-            const nowIso = new Date().toISOString();
-
-            const { error: voteErr } = await supabase
+            const { data: existingVote, error: existingVoteErr } = await supabase
                 .from("caption_votes")
-                .upsert(
-                    {
+                .select("caption_id")
+                .eq("caption_id", captionId)
+                .eq("profile_id", profileId)
+                .maybeSingle();
+
+            if (existingVoteErr) throw new Error(existingVoteErr.message);
+
+            if (existingVote) {
+                const { error: updateErr } = await supabase
+                    .from("caption_votes")
+                    .update({
+                        vote_value,
+                        modified_by_user_id: profileId,
+                    })
+                    .eq("caption_id", captionId)
+                    .eq("profile_id", profileId);
+
+                if (updateErr) throw new Error(updateErr.message);
+            } else {
+                const { error: insertErr } = await supabase
+                    .from("caption_votes")
+                    .insert({
                         caption_id: captionId,
                         profile_id: profileId,
                         vote_value,
-                        created_datetime_utc: nowIso,
-                        modified_datetime_utc: nowIso,
-                    },
-                    { onConflict: "caption_id,profile_id" }
-                );
+                        created_by_user_id: profileId,
+                        modified_by_user_id: profileId,
+                    });
 
-            if (voteErr) throw new Error(voteErr.message);
+                if (insertErr) throw new Error(insertErr.message);
+            }
 
             await fetchCard();
         } catch (err) {

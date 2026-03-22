@@ -127,7 +127,7 @@ export default function GenerateCaptions() {
 
             const { imageId } = await registerRes.json();
 
-            setStatus(`Step 4: Generating ${NUM_CAPTIONS} captions...`);
+            setStatus(`Step 4: Generating captions...`);
 
             const results = await Promise.all(
                 Array.from({ length: NUM_CAPTIONS }, async () => {
