@@ -1,183 +1,264 @@
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
-import SignOutButton from "../components/SignOutButton";
-import {redirect} from "next/navigation";
-
-
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 100;
-const OVERSAMPLE = 8; // fetch extra to still end up with 100 after filtering
-const FETCH_SIZE = PAGE_SIZE * OVERSAMPLE;
+const PAGE_SIZE = 66;
 
-function shuffle<T>(arr: T[]) {
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
+type CaptionRow = {
+    id: string | number;
+    content: string | null;
+    image_id: string | number | null;
+};
+
+type ImageRow = {
+    id: string | number;
+    url: string | null;
+};
+
+function PaginationControls({
+                                safePage,
+                                totalPages,
+                            }: {
+    safePage: number;
+    totalPages: number;
+}) {
+    const buttonStyle = {
+        border: "none",
+        borderRadius: 999,
+        padding: "10px 16px",
+        background: "var(--foreground)",
+        color: "var(--background)",
+        fontWeight: 700,
+        fontSize: 16,
+        fontFamily: "var(--font-fors)",
+        cursor: "pointer",
+        textDecoration: "none",
+    } as const;
+
+    const disabledStyle = {
+        ...buttonStyle,
+        opacity: 0.45,
+        cursor: "default",
+    } as const;
+
+    return (
+        <div className="flex flex-wrap items-center justify-start gap-4">
+            {safePage > 1 ? (
+                <Link href={`/browse?page=${safePage - 1}`} style={buttonStyle}>
+                    Previous
+                </Link>
+            ) : (
+                <span style={disabledStyle}>Previous</span>
+            )}
+
+            <span
+                className="text-base sm:text-lg font-medium"
+                style={{ fontFamily: "var(--font-fors)", color: "var(--background)" }}
+            >
+                Page {safePage} / {totalPages}
+            </span>
+
+            {safePage < totalPages ? (
+                <Link href={`/browse?page=${safePage + 1}`} style={buttonStyle}>
+                    Next
+                </Link>
+            ) : (
+                <span style={disabledStyle}>Next</span>
+            )}
+        </div>
+    );
 }
 
-function chunk<T>(arr: T[], size: number) {
-    const out: T[][] = [];
-    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-    return out;
-}
+export default async function BrowsePage({
+                                             searchParams,
+                                         }: {
+    searchParams?: Promise<{ page?: string }>;
+}) {
+    const params = await searchParams;
+    const currentPage = Math.max(1, Number(params?.page ?? "1") || 1);
 
-export default async function BrowsePage() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    // const { data: { user } } = await supabase.auth.getUser();
-    //
-    // if (!user) redirect("/login");
-
-    // 1) Count images
+    // Count captions that at least have content + image_id
     const { count, error: countErr } = await supabase
-        .from("images")
-        .select("*", { count: "exact", head: true });
+        .from("captions")
+        .select("id", { count: "exact", head: true })
+        .not("content", "is", null)
+        .neq("content", "")
+        .not("image_id", "is", null);
 
     if (countErr) {
         return <div className="p-6 text-red-600">Count error: {countErr.message}</div>;
     }
 
-    const totalImages = count ?? 0;
-    if (totalImages === 0) {
-        return <div className="p-6">No images found.</div>;
+    const totalItems = count ?? 0;
+
+    if (totalItems === 0) {
+        return <div className="p-6">No captions found.</div>;
     }
 
-    // 2) Pick a random window of images
-    const maxStart = Math.max(0, totalImages - FETCH_SIZE);
-    const start = Math.floor(Math.random() * (maxStart + 1));
-    const from = start;
-    const to = Math.min(start + FETCH_SIZE - 1, totalImages - 1);
+    const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+    const safePage = Math.min(currentPage, totalPages);
 
-    const { data: images, error: imagesErr } = await supabase
-        .from("images")
-        .select("id, url")
+    const from = (safePage - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    // Step 1: get captions first
+    const { data: captionData, error: captionErr } = await supabase
+        .from("captions")
+        .select("id, content, image_id")
+        .not("content", "is", null)
+        .neq("content", "")
+        .not("image_id", "is", null)
+        .order("id", { ascending: true })
         .range(from, to);
 
-    if (imagesErr) {
-        return <div className="p-6 text-red-600">Images error: {imagesErr.message}</div>;
+    if (captionErr) {
+        return <div className="p-6 text-red-600">Caption load error: {captionErr.message}</div>;
     }
 
-    // Deduplicate images
-    const uniqueById = new Map<string, { id: string; url: string }>();
-    for (const img of images ?? []) {
-        if (img?.id && !uniqueById.has(String(img.id))) uniqueById.set(String(img.id), img);
-    }
-    const uniqueImages = Array.from(uniqueById.values());
-    const imageIds = uniqueImages.map((img) => img.id);
+    const captionRows = (captionData ?? []) as CaptionRow[];
 
-    // 3) Fetch captions that match those images (BATCHED to avoid huge URL -> 400 Bad Request)
-    const captionByImageId = new Map<string, string>();
-
-    // 100 is a safe batch size for URL length; you can raise to 150 if you want.
-    const batches = chunk(imageIds, 100);
-
-    for (const ids of batches) {
-        const { data: captions, error: captionsErr } = await supabase
-            .from("captions")
-            .select("image_id, content")
-            .in("image_id", ids);
-
-        if (captionsErr) {
-            // show more detail than just "Bad Request" when possible
-            const details =
-                (captionsErr as any)?.details ||
-                (captionsErr as any)?.hint ||
-                (captionsErr as any)?.code ||
-                "";
-            return (
-                <div className="p-6 text-red-600">
-                    Captions error: {captionsErr.message} {details ? `(${details})` : ""}
-                </div>
-            );
-        }
-
-        for (const c of captions ?? []) {
-            const key = String(c.image_id);
-            // only accept non-empty captions
-            const content = (c.content ?? "").trim();
-            if (!captionByImageId.has(key) && content.length > 0) {
-                captionByImageId.set(key, content);
-            }
-        }
-    }
-
-    // ✅ Filter: only images that have a caption
-    const imagesWithCaptions = uniqueImages.filter((img) =>
-        captionByImageId.has(String(img.id))
+    const imageIds = Array.from(
+        new Set(
+            captionRows
+                .map((row) => row.image_id)
+                .filter((id): id is string | number => id !== null)
+                .map(String)
+        )
     );
 
-    // Shuffle and take 100
-    const finalImages = shuffle(imagesWithCaptions).slice(0, PAGE_SIZE);
+    // Step 2: fetch matching images separately
+    const { data: imageData, error: imageErr } =
+        imageIds.length === 0
+            ? { data: [], error: null }
+            : await supabase
+                .from("images")
+                .select("id, url")
+                .in("id", imageIds);
 
+    if (imageErr) {
+        return <div className="p-6 text-red-600">Image load error: {imageErr.message}</div>;
+    }
 
+    const imageRows = (imageData ?? []) as ImageRow[];
+
+    const imageMap = new Map<string, string>();
+    for (const img of imageRows) {
+        const url = (img.url ?? "").trim();
+        if (url) {
+            imageMap.set(String(img.id), url);
+        }
+    }
+
+    const cards = captionRows
+        .map((row) => {
+            const caption = (row.content ?? "").trim();
+            const imageUrl = row.image_id ? imageMap.get(String(row.image_id)) ?? null : null;
+
+            if (!caption || !imageUrl) return null;
+
+            return {
+                id: String(row.id),
+                imageUrl,
+                caption,
+            };
+        })
+        .filter(Boolean) as { id: string; imageUrl: string; caption: string }[];
 
     return (
-        // <div className="relative min-h-screen p-6 flex flex-col items-center">
-        //     <div className="absolute top-8 right-6">
-        //         <SignOutButton />
-        //     </div>
+        <div className="min-h-screen px-6 py-8 flex justify-center">
+            <div className="w-full max-w-7xl">
+                <div className="flex flex-col items-start">
+                    <h1
+                        style={{
+                            marginTop: "30px",
+                            fontFamily: "var(--font-adelia)",
+                            fontSize: 40,
+                        }}
+                    >
+                        Browse
+                    </h1>
 
-            <div className="absolute top-6 left-6 flex flex-col items-start">
-                <h1 className="text-5xl font-bold" style={{ fontFamily: "var(--font-custom)" }}>
-                    Browse
-                </h1>
+                    <Link
+                        href="/gallery"
+                        className="inline-block text-lg"
+                        style={{
+                            border: "none",
+                            borderRadius: 999,
+                            padding: "10px 16px",
+                            marginTop: "20px",
+                            marginBottom: "20px",
+                            background: "var(--foreground)",
+                            color: "var(--background)",
+                            fontWeight: 700,
+                            fontSize: 16,
+                            fontFamily: "var(--font-fors)",
+                            cursor: "pointer",
+                            textDecoration: "none",
+                        }}
+                    >
+                        Back to home
+                    </Link>
 
-                <p className="inline-block text-xl font-bold" style={{ fontFamily: "var(--font-custom)" }}>
-                    Refresh to view 100 new image-caption pairs.
-                </p>
+                    <div
+                        className="w-full rounded-[32px] shadow-sm border p-6 sm:p-8 mt-4 mb-10"
+                        style={{
+                            background: "#d1e4f0",
+                            borderColor: "rgba(0,0,0,0.08)",
+                        }}
+                    >
+                        <div className="mb-8">
+                            <PaginationControls safePage={safePage} totalPages={totalPages} />
+                        </div>
 
-                <Link
-                    href="/gallery"
-                    className="inline-block text-lg underline mt-2"
-                    style={{ fontFamily: "var(--font-custom)" }}
-                >
-                    (Back to home)
-                </Link>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-10 mb-20 mr-8">
-                    {finalImages.map((img) => {
-                        const caption = captionByImageId.get(String(img.id))!;
-
-                        return (
-                            <div key={img.id} className="rounded-lg shadow bg-white overflow-hidden">
-                                {img.url ? (
+                        <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 w-full">
+                            {cards.map((card) => (
+                                <div
+                                    key={card.id}
+                                    className="flex items-start gap-4 rounded-2xl p-4 min-h-[140px] border transition hover:shadow-md"
+                                    style={{
+                                        background: "#f7fcff",
+                                        borderColor: "rgba(0,0,0,0.05)",
+                                    }}
+                                >
                                     <img
-                                        src={img.url}
-                                        alt={caption}
-                                        className="w-full aspect-square object-cover"
+                                        src={card.imageUrl}
+                                        alt={card.caption}
+                                        className="w-28 h-28 object-cover rounded-xl flex-shrink-0"
                                     />
-                                ) : (
-                                    <div className="w-full aspect-square bg-gray-200 grid place-items-center text-sm text-gray-600">
-                                        No image
-                                    </div>
-                                )}
 
-                                <div className="p-3">
-                                    <div
-                                        className="text-sm font-bold"
-                                        style={{ fontFamily: "var(--font-fors)", color: "var(--background)" }}
-                                    >
-                                        {caption}
+                                    <div className="flex-1 min-w-0 flex items-center h-full">
+                                        <div
+                                            className="leading-snug line-clamp-4"
+                                            style={{
+                                                fontFamily: "var(--font-fors)",
+                                                color: "var(--background)",
+                                                fontSize: 16,
+                                            }}
+                                        >
+                                            {card.caption}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                            ))}
+                        </div>
 
-                {finalImages.length < PAGE_SIZE && (
-                    <div className="mt-6 text-sm text-gray-500">
-                        Only showing {finalImages.length} images with captions. If you want to
-                        try harder to reach 100, increase OVERSAMPLE (currently {OVERSAMPLE}).
+                        <div className="mt-8">
+                            <PaginationControls safePage={safePage} totalPages={totalPages} />
+                        </div>
+
+                        {cards.length === 0 && (
+                            <div className="mt-6 text-sm text-gray-500">
+                                No valid image-caption cards found on this page.
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
-         //</div>
+        </div>
     );
 }

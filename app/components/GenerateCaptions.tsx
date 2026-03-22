@@ -5,6 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 
 const LS_CAPTIONS_KEY = "generate_captions_captions";
 const LS_STATUS_KEY = "generate_captions_status";
+const NUM_CAPTIONS = 5;
+
+type CaptionItem = {
+    content: string;
+};
 
 export default function GenerateCaptions() {
     const supabase = createClient();
@@ -12,11 +17,9 @@ export default function GenerateCaptions() {
 
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-    const [captions, setCaptions] = useState<any[]>([]);
+    const [captions, setCaptions] = useState<CaptionItem[]>([]);
     const [status, setStatus] = useState("");
 
-    // ✅ Load persisted captions/status on first mount
     useEffect(() => {
         try {
             const savedCaptions = localStorage.getItem(LS_CAPTIONS_KEY);
@@ -29,7 +32,6 @@ export default function GenerateCaptions() {
         }
     }, []);
 
-    // ✅ Persist captions whenever they change
     useEffect(() => {
         try {
             localStorage.setItem(LS_CAPTIONS_KEY, JSON.stringify(captions));
@@ -38,7 +40,6 @@ export default function GenerateCaptions() {
         }
     }, [captions]);
 
-    // ✅ Persist status whenever it changes
     useEffect(() => {
         try {
             localStorage.setItem(LS_STATUS_KEY, status);
@@ -65,6 +66,7 @@ export default function GenerateCaptions() {
         const {
             data: { session },
         } = await supabase.auth.getSession();
+
         const token = session?.access_token;
 
         if (!token) {
@@ -87,15 +89,23 @@ export default function GenerateCaptions() {
                 }
             );
 
+            if (!presignRes.ok) {
+                throw new Error("Failed to get upload URL");
+            }
+
             const { presignedUrl, cdnUrl } = await presignRes.json();
 
             setStatus("Step 2: Uploading image...");
 
-            await fetch(presignedUrl, {
+            const uploadRes = await fetch(presignedUrl, {
                 method: "PUT",
                 headers: { "Content-Type": file.type },
                 body: file,
             });
+
+            if (!uploadRes.ok) {
+                throw new Error("Failed to upload image");
+            }
 
             setStatus("Step 3: Registering image...");
 
@@ -111,24 +121,49 @@ export default function GenerateCaptions() {
                 }
             );
 
+            if (!registerRes.ok) {
+                throw new Error("Failed to register image");
+            }
+
             const { imageId } = await registerRes.json();
 
-            setStatus("Step 4: Generating captions...");
+            setStatus(`Step 4: Generating ${NUM_CAPTIONS} captions...`);
 
-            const captionsRes = await fetch(
-                "https://api.almostcrackd.ai/pipeline/generate-captions",
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ imageId }),
-                }
+            const results = await Promise.all(
+                Array.from({ length: NUM_CAPTIONS }, async () => {
+                    const captionsRes = await fetch(
+                        "https://api.almostcrackd.ai/pipeline/generate-captions",
+                        {
+                            method: "POST",
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({ imageId }),
+                        }
+                    );
+
+                    if (!captionsRes.ok) {
+                        throw new Error("Failed to generate captions");
+                    }
+
+                    return captionsRes.json();
+                })
             );
 
-            const data = await captionsRes.json();
-            setCaptions(data);
+            const flattened = results.flat();
+
+            const cleaned: CaptionItem[] = flattened
+                .map((item: any) => ({
+                    content: String(item?.content ?? "").trim(),
+                }))
+                .filter((item) => item.content.length > 0);
+
+            const unique = Array.from(
+                new Map(cleaned.map((item) => [item.content, item])).values()
+            );
+
+            setCaptions(unique);
             setStatus("");
         } catch (err) {
             console.error(err);
@@ -142,7 +177,9 @@ export default function GenerateCaptions() {
         try {
             localStorage.removeItem(LS_CAPTIONS_KEY);
             localStorage.removeItem(LS_STATUS_KEY);
-        } catch {}
+        } catch {
+            // ignore storage errors
+        }
     };
 
     return (
@@ -167,10 +204,14 @@ export default function GenerateCaptions() {
 
                 <span
                     className="text-lg truncate max-w-[220px]"
-                    style={{ fontFamily: "var(--font-coolvetica)", color: "var(--background)" }}
+                    style={{
+                        fontFamily: "var(--font-coolvetica)",
+                        color: "var(--background)",
+                        fontSize: 24,
+                    }}
                 >
-          {file ? file.name : "NO FILE CHOSEN"}
-        </span>
+                    {file ? file.name : "NO FILE CHOSEN"}
+                </span>
             </div>
 
             {previewUrl && (
@@ -183,7 +224,7 @@ export default function GenerateCaptions() {
                 </div>
             )}
 
-            <div className="flex items-center gap-3 mt-12">
+            <div className="flex items-center gap-3 mt-4">
                 <button
                     onClick={handleGenerate}
                     className="px-4 py-2 rounded bg-[#F9C784] text-[var(--background)] font-semibold shadow-md hover:bg-[#fcdfb6] transition"
@@ -196,20 +237,45 @@ export default function GenerateCaptions() {
                     type="button"
                     onClick={handleClearCaptions}
                     className="px-4 py-2 rounded border font-semibold"
-                    style={{ fontFamily: "var(--font-adelia)", color: "var(--background)" }}
+                    style={{
+                        fontFamily: "var(--font-adelia)",
+                        color: "var(--background)",
+                    }}
                 >
                     Clear
                 </button>
             </div>
 
-            <p className="mt-2 text-sm" style={{ fontFamily: "var(--font-fors)", color: "var(--background)" }}>
+            <p
+                className="mt-2 text-sm"
+                style={{
+                    fontFamily: "var(--font-fors)",
+                    color: "var(--background)",
+                }}
+            >
                 {status}
             </p>
 
-            <ul className="mt-4 space-y-2" style={{ fontFamily: "var(--font-fors)", color: "var(--background)" }}>
-                {captions.map((c: any, i) => (
+            {/*<p*/}
+            {/*    className="mt-3 text-sm"*/}
+            {/*    style={{*/}
+            {/*        fontFamily: "var(--font-fors)",*/}
+            {/*        color: "var(--background)",*/}
+            {/*    }}*/}
+            {/*>*/}
+            {/*    Caption count: {captions.length}*/}
+            {/*</p>*/}
+
+            <ul
+                className="mt-4 space-y-2"
+                style={{
+                    fontFamily: "var(--font-fors)",
+                    color: "var(--background)",
+                }}
+            >
+                {captions.map((c, i) => (
                     <li key={i} className="border p-2 rounded">
-                        {c.caption || c.content || JSON.stringify(c)}
+                        {c.content}
                     </li>
                 ))}
             </ul>

@@ -1,39 +1,56 @@
-// app/api/cards/route.ts
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function GET() {
     const supabase = await createClient();
 
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr) console.error("auth.getUser error:", userErr);
+    const {
+        data: { user },
+        error: userErr,
+    } = await supabase.auth.getUser();
+
+    if (userErr) {
+        console.error("auth.getUser error:", userErr);
+    }
 
     if (!user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Pull caption candidates (you can raise/lower limit)
-    const { data: captionIds, error: captionIdsError } = await supabase
+    // Only pull caption candidates that already look usable:
+    // - content is not null
+    // - content is not empty string
+    // - image_id exists
+    const { data: captionCandidates, error: captionIdsError } = await supabase
         .from("captions")
         .select("id")
+        .not("content", "is", null)
+        .neq("content", "")
+        .not("image_id", "is", null)
         .limit(5000);
 
     if (captionIdsError) {
         console.error("Error fetching caption IDs:", captionIdsError);
-        return NextResponse.json({ error: "Failed to fetch captions" }, { status: 500 });
+        return NextResponse.json(
+            { error: "Failed to fetch captions" },
+            { status: 500 }
+        );
     }
 
-    if (!captionIds || captionIds.length === 0) {
-        return NextResponse.json({ error: "No captions available" }, { status: 500 });
+    if (!captionCandidates || captionCandidates.length === 0) {
+        return NextResponse.json(
+            { error: "No valid captions available" },
+            { status: 404 }
+        );
     }
 
-    // Try multiple random picks so a single "bad" row doesn't kill the endpoint
-    const MAX_TRIES = 10;
+    const MAX_TRIES = 20;
 
     for (let i = 0; i < MAX_TRIES; i++) {
-        const randomCaptionId = captionIds[Math.floor(Math.random() * captionIds.length)].id;
+        const randomCaptionId =
+            captionCandidates[Math.floor(Math.random() * captionCandidates.length)].id;
 
-        // 1) Fetch caption
+        // Fetch caption
         const { data: cap, error: capErr } = await supabase
             .from("captions")
             .select("id, content, image_id")
@@ -45,12 +62,19 @@ export async function GET() {
             continue;
         }
 
-        if (!cap?.image_id) {
+        const captionText = (cap?.content ?? "").trim();
+
+        if (!cap || !captionText) {
+            console.error("Caption missing/blank content:", { randomCaptionId, cap });
+            continue;
+        }
+
+        if (!cap.image_id) {
             console.error("Caption missing image_id:", { randomCaptionId, cap });
             continue;
         }
 
-        // 2) Fetch image
+        // Fetch image
         const { data: img, error: imgErr } = await supabase
             .from("images")
             .select("url")
@@ -62,22 +86,23 @@ export async function GET() {
             continue;
         }
 
-        if (!img?.url) {
-            console.error("Image missing url:", { image_id: cap.image_id, img });
+        const imageUrl = (img?.url ?? "").trim();
+
+        if (!imageUrl) {
+            console.error("Image missing/blank url:", { image_id: cap.image_id, img });
             continue;
         }
 
-        // Success ✅
+        // Success
         return NextResponse.json({
-            image_url: img.url,
-            caption: cap.content ?? "No caption available.",
-            caption_id: cap.id,
+            image_url: imageUrl,
+            caption: captionText,
+            caption_id: String(cap.id),
         });
     }
 
-    // If we get here, every attempt failed
     return NextResponse.json(
         { error: "Could not find a valid caption+image card after multiple attempts." },
-        { status: 500 }
+        { status: 404 }
     );
 }

@@ -10,6 +10,21 @@ interface Card {
     caption_id: string;
 }
 
+function isValidCard(data: unknown): data is Card {
+    if (!data || typeof data !== "object") return false;
+
+    const card = data as Record<string, unknown>;
+
+    const imageUrl =
+        typeof card.image_url === "string" ? card.image_url.trim() : "";
+    const caption =
+        typeof card.caption === "string" ? card.caption.trim() : "";
+    const captionId =
+        typeof card.caption_id === "string" ? card.caption_id.trim() : "";
+
+    return imageUrl.length > 0 && caption.length > 0 && captionId.length > 0;
+}
+
 export default function CardDisplay() {
     const router = useRouter();
     const supabase = createClient();
@@ -20,50 +35,85 @@ export default function CardDisplay() {
     const [error, setError] = useState<string | null>(null);
     const [profileId, setProfileId] = useState<string | null>(null);
 
-    // ✅ prevents double-fetch on initial render (dev Strict Mode)
     const didInitialFetch = useRef(false);
 
     const fetchCard = async () => {
         setLoadingCard(true);
         setError(null);
+
         try {
-            const response = await fetch("/api/cards", { cache: "no-store" });
-            if (response.status === 401) {
-                router.push("/login");
+            let validCard: Card | null = null;
+
+            for (let attempt = 0; attempt < 5; attempt++) {
+                const response = await fetch("/api/cards", { cache: "no-store" });
+
+                if (response.status === 401) {
+                    router.push("/login");
+                    return;
+                }
+
+                if (response.status === 404) {
+                    setCard(null);
+                    setLoadingCard(false);
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch card: " + response.statusText);
+                }
+
+                const data: unknown = await response.json();
+
+                if (isValidCard(data)) {
+                    validCard = {
+                        image_url: data.image_url.trim(),
+                        caption: data.caption.trim(),
+                        caption_id: data.caption_id.trim(),
+                    };
+                    break;
+                }
+            }
+
+            if (!validCard) {
+                setCard(null);
+                setError("No valid cards with both an image and a caption were found.");
                 return;
             }
-            if (!response.ok) throw new Error("Failed to fetch card: " + response.statusText);
 
-            const data: Card = await response.json();
-            setCard(data);
+            setCard(validCard);
         } catch (err) {
             setError(err instanceof Error ? err.message : "An unknown error occurred");
+            setCard(null);
         } finally {
             setLoadingCard(false);
         }
     };
 
-    // 1) Get user + subscribe to auth changes
     useEffect(() => {
         const getProfile = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
             if (user) setProfileId(user.id);
             else router.push("/login");
         };
+
         void getProfile();
 
-        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (session?.user) setProfileId(session.user.id);
-            else {
-                setProfileId(null);
-                router.push("/login");
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                if (session?.user) setProfileId(session.user.id);
+                else {
+                    setProfileId(null);
+                    router.push("/login");
+                }
             }
-        });
+        );
 
         return () => authListener?.subscription?.unsubscribe();
     }, [supabase, router]);
 
-    // 2) ✅ Fetch the first card only AFTER we have a profileId, and only once
     useEffect(() => {
         if (!profileId) return;
         if (didInitialFetch.current) return;
@@ -84,6 +134,7 @@ export default function CardDisplay() {
 
         try {
             const nowIso = new Date().toISOString();
+
             const { error: voteErr } = await supabase
                 .from("caption_votes")
                 .upsert(
@@ -99,7 +150,6 @@ export default function CardDisplay() {
 
             if (voteErr) throw new Error(voteErr.message);
 
-            // next card
             await fetchCard();
         } catch (err) {
             setError(err instanceof Error ? err.message : "Voting failed.");
@@ -108,37 +158,56 @@ export default function CardDisplay() {
         }
     };
 
-    if (loadingCard) return <div className="text-center p-4">Loading card...</div>;
-    if (error) return <div className="text-center p-4 text-red-500">Error: {error}</div>;
-    if (!card) return <div className="text-center p-4">No card to display.</div>;
+    if (loadingCard) {
+        return <div className="text-center p-4 text-[var(--background)]">Loading card...</div>;
+    }
+
+    if (error) {
+        return <div className="text-center p-4 text-red-500">Error: {error}</div>;
+    }
+
+    if (!card) {
+        return <div className="text-center p-4">No card to display.</div>;
+    }
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-            <div className="bg-[#FFFFFF] shadow-lg rounded-lg p-6 max-w-md w-full">
-                <img
-                    src={card.image_url}
-                    alt={card.caption}
-                    className="w-full h-auto object-cover rounded-md mb-4"
-                />
+        <div className="flex justify-center items-start min-h-[60vh] p-2 sm:p-4">
+            <div className="bg-[#f7fcff] shadow-lg rounded-xl p-4 sm:p-5 w-full max-w-xl max-h-[70vh] flex flex-col">
+
+                {/* IMAGE AREA */}
+                <div className="flex justify-center items-center h-[45vh]">
+                    <img
+                        src={card.image_url}
+                        alt={card.caption}
+                        className="max-h-full max-w-full object-contain rounded-md"
+                    />
+                </div>
+
+                {/* CAPTION */}
                 <p
-                    className="text-2xl text-center font-bold"
-                    style={{ fontFamily: "var(--font-fors)", color: "var(--background)" }}
+                    className="mt-2 text-base sm:text-lg text-center font-bold"
+                    style={{
+                        fontFamily: "var(--font-fors)",
+                        color: "var(--background)",
+                    }}
                 >
                     {card.caption}
                 </p>
 
-                <div className="mt-6 flex justify-center w-full">
+                {/* BUTTONS */}
+                <div className="mt-3 flex justify-center w-full">
                     <button
                         onClick={() => void voteOnCaption(card.caption_id, 1)}
                         disabled={voting}
-                        className="px-6 py-3 bg-[#7EB09B] text-white text-3xl font-bold rounded-lg shadow-md hover:bg-[#a9cfbf] mr-8 disabled:opacity-50"
+                        className="px-5 py-2 bg-[#7EB09B] text-white text-2xl font-bold rounded-lg shadow-md hover:bg-[#a9cfbf] mr-6 disabled:opacity-50"
                     >
                         &uarr;
                     </button>
+
                     <button
                         onClick={() => void voteOnCaption(card.caption_id, -1)}
                         disabled={voting}
-                        className="px-6 py-3 bg-[#DE89BE] text-white text-3xl font-bold rounded-lg shadow-md hover:bg-[#E3AACD] ml-8 disabled:opacity-50"
+                        className="px-5 py-2 bg-[#DE89BE] text-white text-2xl font-bold rounded-lg shadow-md hover:bg-[#E3AACD] ml-6 disabled:opacity-50"
                     >
                         &darr;
                     </button>
