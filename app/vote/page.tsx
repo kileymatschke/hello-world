@@ -57,12 +57,34 @@ export default async function VotePage() {
 
                     {/* Main content container */}
                     <div
-                        className="bg-white/95 w-full max-w-3xl mx-auto rounded-[28px] border p-4 sm:p-5 shadow-sm mt-2"
+                        className="bg-white/95 w-full max-w-4xl mx-auto rounded-[28px] border p-4 sm:p-5 shadow-sm mt-2"
                         style={{
                             background: "#cadeeb",
                             borderColor: "rgba(0,0,0,0.06)",
                         }}
                     >
+
+                        <p
+                            className="mt-4 text-sm text-center"
+                            style={{
+                                fontFamily: "var(--font-fors)",
+                                fontSize: 18,
+                                color: "var(--background)",
+                                fontWeight: 600,
+                            }}
+                        >
+                            Click the up arrow if you find an image-caption pair funny or the down arrow if you don't.<br />
+                            Your responses help us understand which types of captions perform best.<br />
+                            You may see images repeated with different captions.
+                        </p>
+
+                        <p
+                            className="mt-4 text-sm text-center"
+
+                        >
+                        </p>
+
+
                         <CardDisplay />
                     </div>
                 </div>

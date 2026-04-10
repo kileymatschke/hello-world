@@ -189,7 +189,7 @@ export default function CardDisplay() {
 
     return (
         <div className="flex justify-center items-start min-h-[60vh] p-2 sm:p-4">
-            <div className="bg-[#f7fcff] shadow-lg rounded-xl p-4 sm:p-5 w-full max-w-xl max-h-[70vh] flex flex-col">
+            <div className="bg-(--cards) shadow-lg rounded-xl p-4 sm:p-5 w-full max-w-xl max-h-[70vh] flex flex-col">
 
                 {/* IMAGE AREA */}
                 <div className="flex justify-center items-center h-[45vh]">
@@ -206,6 +206,7 @@ export default function CardDisplay() {
                     style={{
                         fontFamily: "var(--font-fors)",
                         color: "var(--background)",
+                        fontSize: 20
                     }}
                 >
                     {card.caption}

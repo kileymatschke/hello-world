@@ -3,7 +3,8 @@
 :root {
   --background: #2475a6;
   --foreground: #ffcd71;
-  --browse: #bfd5e3
+  --browse: #bfd5e3;
+  --cards: #f7fcff;
 }
 
 /*@media (prefers-color-scheme: dark) {*/

@@ -14,11 +14,20 @@ type CaptionItem = {
 export default function GenerateCaptions() {
     const supabase = createClient();
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const latestRequestIdRef = useRef(0);
 
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [captions, setCaptions] = useState<CaptionItem[]>([]);
     const [status, setStatus] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const messageStyle = {
+        fontFamily: "var(--font-fors)",
+        fontSize: 18,
+        color: "var(--background)",
+        opacity: 0.75,
+    } as const;
 
     useEffect(() => {
         try {
@@ -61,7 +70,10 @@ export default function GenerateCaptions() {
     }, [file]);
 
     const handleGenerate = async () => {
-        if (!file) return;
+        if (!file || isGenerating) return;
+
+        const requestId = ++latestRequestIdRef.current;
+        setIsGenerating(true);
 
         const {
             data: { session },
@@ -71,6 +83,7 @@ export default function GenerateCaptions() {
 
         if (!token) {
             alert("Not logged in");
+            setIsGenerating(false);
             return;
         }
 
@@ -127,7 +140,7 @@ export default function GenerateCaptions() {
 
             const { imageId } = await registerRes.json();
 
-            setStatus(`Step 4: Generating captions...`);
+            setStatus("Step 4: Generating captions... this may take several moments");
 
             const results = await Promise.all(
                 Array.from({ length: NUM_CAPTIONS }, async () => {
@@ -151,6 +164,8 @@ export default function GenerateCaptions() {
                 })
             );
 
+            if (requestId !== latestRequestIdRef.current) return;
+
             const flattened = results.flat();
 
             const cleaned: CaptionItem[] = flattened
@@ -163,11 +178,17 @@ export default function GenerateCaptions() {
                 new Map(cleaned.map((item) => [item.content, item])).values()
             );
 
-            setCaptions(unique);
+            setCaptions(unique.slice(0, 10));
             setStatus("");
         } catch (err) {
             console.error(err);
-            setStatus("Error occurred");
+            if (requestId === latestRequestIdRef.current) {
+                setStatus("Error occurred");
+            }
+        } finally {
+            if (requestId === latestRequestIdRef.current) {
+                setIsGenerating(false);
+            }
         }
     };
 
@@ -183,7 +204,7 @@ export default function GenerateCaptions() {
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+        <div className="bg-(--cards) p-6 rounded-2xl shadow-md w-full max-w-2xl">
             <input
                 ref={fileInputRef}
                 type="file"
@@ -192,11 +213,37 @@ export default function GenerateCaptions() {
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
 
-            <div className="flex items-center gap-3">
+            <p
+                className="mt-2 text-sm text-center"
+                style={{
+                    fontFamily: "var(--font-fors)",
+                    fontSize: 18,
+                    color: "var(--background)",
+                    fontWeight: 600,
+                }}
+            >
+                Upload an image to generate corresponding captions. <br />
+                These captions are part of a larger study in AI humor to understand
+                how different wording affects how people interpret and respond to images.
+            </p>
+
+            <p
+                className="mt-12 text-sm"
+                style={{
+                    fontFamily: "var(--font-fors)",
+                    fontSize: 20,
+                    color: "var(--background)",
+                    fontWeight: 700,
+                }}
+            >
+                STEP 1
+            </p>
+
+            <div className="mt-2 flex items-center gap-3">
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 rounded bg-[#F9C784] text-[var(--background)] font-semibold shadow-md hover:bg-[#fcdfb6] transition"
+                    className="px-4 py-2 rounded-xl bg-[#F9C784] text-[var(--background)] font-semibold shadow-md hover:bg-[#fcdfb6] transition"
                     style={{ fontFamily: "var(--font-adelia)" }}
                 >
                     Choose image
@@ -208,35 +255,53 @@ export default function GenerateCaptions() {
                         fontFamily: "var(--font-coolvetica)",
                         color: "var(--background)",
                         fontSize: 24,
+                        opacity: 0.7,
                     }}
                 >
                     {file ? file.name : "NO FILE CHOSEN"}
                 </span>
             </div>
 
+            <p className="mt-2 text-sm" style={messageStyle}>
+                Accepted file types: jpg, png, gif, webp, bmp, svg, tiff
+            </p>
+
             {previewUrl && (
                 <div className="mt-4">
                     <img
                         src={previewUrl}
                         alt="Uploaded preview"
-                        className="w-full max-h-80 object-contain rounded border"
+                        className="w-full max-h-80 object-contain rounded"
                     />
                 </div>
             )}
 
-            <div className="flex items-center gap-3 mt-4">
+            <p
+                className="mt-12 text-sm"
+                style={{
+                    fontFamily: "var(--font-fors)",
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "var(--background)",
+                }}
+            >
+                STEP 2
+            </p>
+
+            <div className="flex items-center gap-3 mt-2">
                 <button
                     onClick={handleGenerate}
-                    className="px-4 py-2 rounded bg-[#F9C784] text-[var(--background)] font-semibold shadow-md hover:bg-[#fcdfb6] transition"
+                    disabled={isGenerating}
+                    className="px-4 py-2 rounded-xl bg-[#F9C784] text-[var(--background)] font-semibold shadow-md hover:bg-[#fcdfb6] transition disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ fontFamily: "var(--font-adelia)" }}
                 >
-                    Generate Captions
+                    {isGenerating ? "Generating..." : "Generate Captions"}
                 </button>
 
                 <button
                     type="button"
                     onClick={handleClearCaptions}
-                    className="px-4 py-2 rounded border font-semibold"
+                    className="px-4 py-2 rounded-xl border font-semibold"
                     style={{
                         fontFamily: "var(--font-adelia)",
                         color: "var(--background)",
@@ -246,31 +311,16 @@ export default function GenerateCaptions() {
                 </button>
             </div>
 
-            <p
-                className="mt-2 text-sm"
-                style={{
-                    fontFamily: "var(--font-fors)",
-                    color: "var(--background)",
-                }}
-            >
+            <p className="mt-2 text-sm" style={messageStyle}>
                 {status}
             </p>
-
-            {/*<p*/}
-            {/*    className="mt-3 text-sm"*/}
-            {/*    style={{*/}
-            {/*        fontFamily: "var(--font-fors)",*/}
-            {/*        color: "var(--background)",*/}
-            {/*    }}*/}
-            {/*>*/}
-            {/*    Caption count: {captions.length}*/}
-            {/*</p>*/}
 
             <ul
                 className="mt-4 space-y-2"
                 style={{
                     fontFamily: "var(--font-fors)",
                     color: "var(--background)",
+                    fontSize: 18
                 }}
             >
                 {captions.map((c, i) => (

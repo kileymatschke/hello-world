@@ -55,6 +55,11 @@ export default async function GeneratePage() {
                     {/* <div className="mt-4 shrink-0">
                         <SignOutButton />
                     </div> */}
+
+
+
+
+
                 </div>
 
                 {/* Main content */}
