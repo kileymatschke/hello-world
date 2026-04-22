@@ -223,8 +223,7 @@ export default function GenerateCaptions() {
                 }}
             >
                 Upload an image to generate corresponding captions. <br />
-                These captions are part of a larger study in AI humor to understand
-                how different wording affects how people interpret and respond to images.
+                Captions are generated via LLMs as part of a larger study in AI humor.
             </p>
 
             <p

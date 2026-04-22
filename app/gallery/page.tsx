@@ -14,25 +14,27 @@ export default async function GalleryPage() {
 
     return (
         <div className="relative flex flex-col items-center min-h-screen px-4 py-6 overflow-hidden">
-            <div className="mt-14 absolute top-36 left-1/2 -translate-x-1/2 z-50">
-                <SignOutButton />
-            </div>
+
 
             <h1
                 className="mt-12 text-4xl sm:text-5xl md:text-6xl font-bold mb-2 mt-4 text-center"
-                style={{ fontFamily: "var(--font-custom)", color: "var(--foreground)", fontSize: 70 }}
+                style={{ fontWeight: 1000, fontFamily: "var(--font-fors)", color: "var(--foreground)", fontSize: 16 }}
             >
-                The Humor Project
+                THE HUMOR PROJECT:
             </h1>
 
             <h2
-                className="text-base sm:text-lg md:text-xl font-bold text-center"
-                style={{ fontFamily: "var(--font-custom)", color: "var(--foreground)", fontSize: 24 }}
+                className="mt-2 text-base sm:text-lg md:text-xl font-bold text-center"
+                style={{ fontFamily: "var(--font-adelia)", color: "var(--foreground)", fontSize: 32 }}
             >
-                Project 1: Public-facing voting site for captions
+                Caption Creation + Rating App
             </h2>
 
-            <div className="mt-20 flex flex-wrap justify-center items-center gap-6 md:gap-8 w-full max-w-7xl">
+            <div className="py-6">
+                <SignOutButton />
+            </div>
+
+            <div className="mt-2 flex flex-wrap justify-center items-center gap-6 md:gap-8 w-full max-w-7xl">
                 <div className="z-20 flex justify-center">
                     <Link
                         href="/browse"
