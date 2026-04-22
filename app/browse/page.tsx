@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import BrowseCardGrid from "../components/BrowseCardGrid";
 
@@ -58,14 +59,12 @@ function PaginationControls({
     const endPage = Math.min(totalPages, safePage + 2);
 
     const pages = [];
-
     for (let p = startPage; p <= endPage; p++) {
         pages.push(p);
     }
 
     return (
         <div className="flex flex-wrap items-center gap-3">
-            {/* Previous */}
             {safePage > 1 ? (
                 <Link href={`/browse?page=${safePage - 1}`} style={buttonStyle}>
                     Previous
@@ -74,27 +73,28 @@ function PaginationControls({
                 <span style={disabledStyle}>Previous</span>
             )}
 
-            {/* First page */}
             {startPage > 1 && (
                 <>
                     <Link href="/browse?page=1" style={pageNumberStyle(safePage === 1)}>
                         1
                     </Link>
-                    {startPage > 2 && <span style={{ color: "var(--background)", fontWeight: 700 }}>...</span>}
+                    {startPage > 2 && (
+                        <span style={{ color: "var(--background)", fontWeight: 700 }}>...</span>
+                    )}
                 </>
             )}
 
-            {/* Middle pages */}
             {pages.map((p) => (
                 <Link key={p} href={`/browse?page=${p}`} style={pageNumberStyle(p === safePage)}>
                     {p}
                 </Link>
             ))}
 
-            {/* Last page */}
             {endPage < totalPages && (
                 <>
-                    {endPage < totalPages - 1 && <span style={{ color: "var(--background)", fontWeight: 700 }}>...</span>}
+                    {endPage < totalPages - 1 && (
+                        <span style={{ color: "var(--background)", fontWeight: 700 }}>...</span>
+                    )}
                     <Link
                         href={`/browse?page=${totalPages}`}
                         style={pageNumberStyle(safePage === totalPages)}
@@ -104,7 +104,6 @@ function PaginationControls({
                 </>
             )}
 
-            {/* Next */}
             {safePage < totalPages ? (
                 <Link href={`/browse?page=${safePage + 1}`} style={buttonStyle}>
                     Next
@@ -112,91 +111,26 @@ function PaginationControls({
             ) : (
                 <span style={disabledStyle}>Next</span>
             )}
-
-            {/* Page indicator */}
-      {/*      <span*/}
-      {/*          className="ml-2"*/}
-      {/*          style={{*/}
-      {/*              fontFamily: "var(--font-fors)",*/}
-      {/*              fontSize: 14,*/}
-      {/*              color: "var(--background)",*/}
-      {/*              opacity: 0.7,*/}
-      {/*          }}*/}
-      {/*      >*/}
-      {/*  {safePage} / {totalPages}*/}
-      {/*</span>*/}
         </div>
     );
 }
-
-
-// function PaginationControls({
-//                                 safePage,
-//                                 totalPages,
-//                             }: {
-//     safePage: number;
-//     totalPages: number;
-// }) {
-//     const buttonStyle = {
-//         border: "none",
-//         borderRadius: 999,
-//         padding: "10px 16px",
-//         background: "var(--foreground)",
-//         color: "var(--background)",
-//         fontWeight: 700,
-//         fontSize: 16,
-//         fontFamily: "var(--font-fors)",
-//         cursor: "pointer",
-//         textDecoration: "none",
-//     } as const;
-//
-//     const disabledStyle = {
-//         ...buttonStyle,
-//         opacity: 0.45,
-//         cursor: "default",
-//     } as const;
-//
-//     return (
-//         <div className="flex flex-wrap items-center justify-start gap-4">
-//             {safePage > 1 ? (
-//                 <Link href={`/browse?page=${safePage - 1}`} style={buttonStyle}>
-//                     Previous
-//                 </Link>
-//             ) : (
-//                 <span style={disabledStyle}>Previous</span>
-//             )}
-//
-//             <span
-//                 className="text-base sm:text-lg font-medium"
-//                 style={{ fontFamily: "var(--font-fors)", color: "var(--background)" }}
-//             >
-//                 Page {safePage} / {totalPages}
-//             </span>
-//
-//             {safePage < totalPages ? (
-//                 <Link href={`/browse?page=${safePage + 1}`} style={buttonStyle}>
-//                     Next
-//                 </Link>
-//             ) : (
-//                 <span style={disabledStyle}>Next</span>
-//             )}
-//         </div>
-//     );
-// }
 
 export default async function BrowsePage({
                                              searchParams,
                                          }: {
     searchParams?: Promise<{ page?: string }>;
 }) {
+    const supabase = await createClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) redirect("/login");
+
     const params = await searchParams;
     const currentPage = Math.max(1, Number(params?.page ?? "1") || 1);
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    // Count captions that at least have content + image_id
     const { count, error: countErr } = await supabase
         .from("captions")
         .select("id", { count: "exact", head: true })
@@ -220,7 +154,6 @@ export default async function BrowsePage({
     const from = (safePage - 1) * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    // Step 1: get captions first
     const { data: captionData, error: captionErr } = await supabase
         .from("captions")
         .select("id, content, image_id")
@@ -245,7 +178,6 @@ export default async function BrowsePage({
         )
     );
 
-    // Step 2: fetch matching images separately
     const { data: imageData, error: imageErr } =
         imageIds.length === 0
             ? { data: [], error: null }
@@ -330,38 +262,6 @@ export default async function BrowsePage({
                         </div>
 
                         <BrowseCardGrid cards={cards} />
-
-                        {/*<div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 w-full">*/}
-                        {/*    {cards.map((card) => (*/}
-                        {/*        <div*/}
-                        {/*            key={card.id}*/}
-                        {/*            className="flex items-start gap-4 rounded-2xl p-4 min-h-[140px] border transition hover:shadow-md"*/}
-                        {/*            style={{*/}
-                        {/*                background: "#f7fcff",*/}
-                        {/*                borderColor: "rgba(0,0,0,0.05)",*/}
-                        {/*            }}*/}
-                        {/*        >*/}
-                        {/*            <img*/}
-                        {/*                src={card.imageUrl}*/}
-                        {/*                alt={card.caption}*/}
-                        {/*                className="w-28 h-28 object-cover rounded-xl flex-shrink-0"*/}
-                        {/*            />*/}
-
-                        {/*            <div className="flex-1 min-w-0 flex items-center h-full">*/}
-                        {/*                <div*/}
-                        {/*                    className="leading-snug line-clamp-4"*/}
-                        {/*                    style={{*/}
-                        {/*                        fontFamily: "var(--font-fors)",*/}
-                        {/*                        color: "var(--background)",*/}
-                        {/*                        fontSize: 16,*/}
-                        {/*                    }}*/}
-                        {/*                >*/}
-                        {/*                    {card.caption}*/}
-                        {/*                </div>*/}
-                        {/*            </div>*/}
-                        {/*        </div>*/}
-                        {/*    ))}*/}
-                        {/*</div>*/}
 
                         <div className="mt-8">
                             <PaginationControls safePage={safePage} totalPages={totalPages} />
